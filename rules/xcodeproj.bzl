@@ -169,7 +169,8 @@ def _xcodeproj_impl(ctx):
         "BAZEL_PATH": ctx.attr.bazel_path,
         "BAZEL_WORKSPACE_ROOT": "$SRCROOT/%s" % script_dot_dots,
         "BAZEL_STUBS_DIR": "$PROJECT_FILE_PATH/bazelstubs",
-        "BAZEL_INSTALLER": "$BAZEL_STUBS_DIR/%s" % ctx.executable.installer.short_path,
+        "BAZEL_INSTALLERS_DIR": "$PROJECT_FILE_PATH/bazelinstallers",
+        "BAZEL_INSTALLER": "$BAZEL_INSTALLERS_DIR/%s" % ctx.executable.installer.basename,
         "CC": "$BAZEL_STUBS_DIR/clang-stub",
         "CXX": "$CC",
         "CLANG_ANALYZER_EXEC": "$CC",
@@ -211,6 +212,7 @@ def _xcodeproj_impl(ctx):
             "PRODUCT_NAME": target_info.name,
             "BAZEL_BIN_SUBDIR": target_info.bazel_bin_subdir,
             "MACH_O_TYPE": target_macho_type,
+            "CLANG_ENABLE_MODULES": "YES",
         }
 
         if target_info.product_type == "application":
@@ -218,7 +220,6 @@ def _xcodeproj_impl(ctx):
             target_settings["PRODUCT_BUNDLE_IDENTIFIER"] = target_info.bundle_id
         if target_info.product_type == "bundle.unit-test":
             target_settings["SUPPORTS_MACCATALYST"] = False
-
         target_dependencies = []
         test_host_appname = getattr(target_info, "test_host_appname", None)
         if test_host_appname:
@@ -297,12 +298,14 @@ $BAZEL_INSTALLER
         "%s-install-xcodeproj.sh" % ctx.attr.name,
     )
 
+    installer_runfile_paths = [i.short_path for i in ctx.attr.installer[DefaultInfo].default_runfiles.files]
     ctx.actions.expand_template(
         template = ctx.file._xcodeproj_installer_template,
         output = install_script,
         substitutions = {
             "$(project_short_path)": project.short_path,
             "$(project_full_path)": project.path,
+            "$(installer_runfile_short_paths)": ' '.join(installer_runfile_paths),
             "$(installer_short_path)": ctx.executable.installer.short_path,
             "$(clang_stub_short_path)": ctx.executable.clang_stub.short_path,
             "$(clang_stub_ld_path)": ctx.executable.ld_stub.short_path,

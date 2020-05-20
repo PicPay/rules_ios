@@ -10,6 +10,8 @@
 set -eux
 
 
+diagnostics_dir="$TARGET_BUILD_DIR/../../../bazel-xcode-diagnostics/"
+mkdir -p $diagnostics_dir
 
 case ${PRODUCT_TYPE} in
     com.apple.product-type.framework)
@@ -27,6 +29,7 @@ case ${PRODUCT_TYPE} in
         ;;
 esac
 output="$TARGET_BUILD_DIR/$FULL_PRODUCT_NAME"
+
 mkdir -p "$(dirname "$output")"
 
 if [[ -d $input ]]; then
@@ -35,19 +38,13 @@ if [[ -d $input ]]; then
     input+="/"
 fi
 
-rsync --quiet \
+rsync \
     --recursive --chmod=u+w --delete \
-    "$input" "$output"
+    "$input" "$output" > $diagnostics_dir/rsync-stdout.log 2> $diagnostics_dir/rsync-stderr.log
 
 
 # Part of the build intermediary output will be swiftmodule files
 # which XCode will use for indexing. Let's keep those.
-"$BAZEL_WORKSPACE_ROOT"/tools/bazel-xcodeproj/installers/swiftmodules.sh >/dev/null 2>&1 &
-
-# This is more complicated, requires installing lyft/index-import, revisit.
-# "$SRCROOT"/bazel/installers/indexstores.sh >/dev/null 2>&1 &
-
-"$BAZEL_WORKSPACE_ROOT"/tools/bazel-xcodeproj/installers/lldb-settings.sh >/dev/null 2>&1 &
-
-
-wait
+$BAZEL_INSTALLERS_DIR/swiftmodules.sh > $diagnostics_dir/swiftmodules-stdout.log 2> $diagnostics_dir/swiftmodules-stderr.log &
+$BAZEL_INSTALLERS_DIR/indexstores.sh > $diagnostics_dir/indexstores-stdout.log 2> $diagnostics_dir/indexstores-stderr.log &
+$BAZEL_INSTALLERS_DIR/lldb-settings.sh  > $diagnostics_dir/lldb-stdout.log 2> $diagnostics_dir/lldb-stderr.log &
